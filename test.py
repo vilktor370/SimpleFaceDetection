@@ -1,5 +1,5 @@
 from PyQt5 import QtGui
-from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QVBoxLayout, QPushButton
 from PyQt5.QtGui import QPixmap
 import sys
 import cv2
@@ -13,12 +13,14 @@ class VideoThread(QThread):
     def __init__(self):
         super().__init__()
         self._run_flag = True
+        self.frame = None
 
     def run(self):
         # capture from web cam
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(2)
         while self._run_flag:
             ret, cv_img = cap.read()
+            self.frame = cv_img
             if ret:
                 self.change_pixmap_signal.emit(cv_img)
         # shut down capture system
@@ -28,6 +30,9 @@ class VideoThread(QThread):
         """Sets run flag to False and waits for thread to finish"""
         self._run_flag = False
         self.wait()
+
+    def getFrame(self):
+        return self.frame
 
 
 class App(QWidget):
@@ -42,10 +47,17 @@ class App(QWidget):
         # create a text label
         self.textLabel = QLabel('Webcam')
 
+        # take image button
+        self.imgTakenBtn = QPushButton("&Take Image!")
+
+        # signals
+        self.imgTakenBtn.clicked.connect(self.doTakeImage)
+
         # create a vertical box layout and add the two labels
         vbox = QVBoxLayout()
         vbox.addWidget(self.image_label)
         vbox.addWidget(self.textLabel)
+        vbox.addWidget(self.imgTakenBtn)
         # set the vbox layout as the widgets layout
         self.setLayout(vbox)
 
@@ -56,11 +68,11 @@ class App(QWidget):
         # start the thread
         self.thread.start()
 
+
+
     def closeEvent(self, event):
         self.thread.stop()
         event.accept()
-
-
 
     @pyqtSlot(np.ndarray)
     def update_image(self, cv_img):
@@ -77,7 +89,12 @@ class App(QWidget):
         p = convert_to_Qt_format.scaled(self.disply_width, self.display_height, Qt.KeepAspectRatio)
         return QPixmap.fromImage(p)
 
-if __name__=="__main__":
+    def doTakeImage(self):
+        frame = self.thread.getFrame()
+        cv2.imwrite("test.png", frame)
+
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     a = App()
     a.show()
